@@ -1,16 +1,16 @@
+#include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <syslog.h>
-#include <sys/inotify.h>
 #include <dirent.h>
-#include <time.h>
 #include <string.h>
-#include "library.h"
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/inotify.h>
 
+#include "library.h"
 
 // Function to transform main process into a daemon
 static void become_daemon()
@@ -76,8 +76,7 @@ static void become_daemon()
 
 int main()
 {
-	printf("daemon running as : %d\n", getpid());
-	printf("%s\n", REPORT_DIR);
+	printf("daemon : running as [%d]\n", getpid());
 	// Transform into a daemon process
 	become_daemon();
 	// here code
