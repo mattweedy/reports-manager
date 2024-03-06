@@ -5,6 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <stdbool.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/syslog.h>
@@ -209,8 +210,13 @@ void backup(char *src_dir, char *dst_dir)
 		exit(EXIT_FAILURE);
 	}
 
+	printf("file_transfer : starting backup...\n");
+	printf("file_transfer : locking directories...\n");
+
 	lock_directory(src_dir);
 	lock_directory(dst_dir);
+
+	printf("file_transfer : locked directories...\n");
 
 	while ((entry = readdir(dir)) != NULL) {
 		// printf("file name: %s\n", entry->d_name);
@@ -246,8 +252,14 @@ void backup(char *src_dir, char *dst_dir)
 	}
 
 	closedir(dir);
+
+	printf("file_transfer : unlocking directories...\n");
+
 	unlock_directory(src_dir);
 	unlock_directory(dst_dir);
+
+	printf("file_transfer : unlocked directories...\n");
+	printf("file_transfer : backup complete\n");
 }
 
 int main(int argc, char *argv[])
@@ -289,6 +301,9 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	bool doing_backup = false;
+	bool doing_copy = false;
+
 	for (;;) { // this is for sitting and waiting when daemon calls it
 		time_t now = time(NULL);
 		struct tm *tm = localtime(&now);
@@ -302,15 +317,27 @@ int main(int argc, char *argv[])
 		// TODO: managers must upload to /reports/ by 23:00 if not, log it
 
 		// if it is 01:00, copy to dashboard
-		if (strcmp(current_time, "01:00") == 0) { // TODO: use <library.h> COPY_TIME
-			syslog(LOG_INFO, "DAEMON:file_transfer : initiating automatic copy to dashboard\n");
-			copy_to_dashboard(REPORT_DIR, DASHBOARD_DIR);
+		if (strcmp(current_time, "00:44") == 0) { // TODO: use <library.h> COPY_TIME
+			if (!doing_copy) {
+				doing_copy = true;
+				syslog(LOG_INFO, "DAEMON:file_transfer : initiating automatic copy to dashboard\n");
+				// printf("DAEMON:file_transfer : initiating automatic copy to dashboard\n");
+				copy_to_dashboard(REPORT_DIR, DASHBOARD_DIR);
+			} 
+		} else if (strcmp(current_time, "00:45") == 0) {
+			doing_copy = false;
 		}
 
 		// if it is 03:00, backup
-		if (strcmp(current_time, "03:00") == 0) {
-			syslog(LOG_INFO, "DAEMON:file_transfer : initiating automatic backup\n");
-			backup(DASHBOARD_DIR, BACKUP_DIR);
+		if (strcmp(current_time, "00:45") == 0) {
+			if (!doing_backup) {
+				doing_backup = true;
+				syslog(LOG_INFO, "DAEMON:file_transfer : initiating automatic backup\n");
+				// printf("DAEMON:file_transfer : initiating automatic backup\n");
+				backup(DASHBOARD_DIR, BACKUP_DIR);
+			}
+		} else if (strcmp(current_time, "00:46") == 0) {
+			doing_backup = false;
 		}
 		sleep(5);
 	}
