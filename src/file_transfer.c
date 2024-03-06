@@ -16,7 +16,7 @@
 
 void lock_directory(char *path);
 void unlock_directory(char *path);
-void copy_to_dashboard(char *src_dir, char *dst_dir);
+void transfer_to_dashboard(char *src_dir, char *dst_dir);
 void backup(char *src_dir, char *dst_dir);
 
 void lock_directory(char *path) {
@@ -100,7 +100,7 @@ void unlock_directory(char *path) {
 }
 
 
-void copy_to_dashboard(char *src_dir, char *dst_dir)
+void transfer_to_dashboard(char *src_dir, char *dst_dir)
 {
 	DIR *dir;
 	struct dirent *entry;
@@ -141,7 +141,7 @@ void copy_to_dashboard(char *src_dir, char *dst_dir)
 			// create the directory in dst_dir, if it doesn't exist
 			mkdir(dst_file, 0220);
 			// recurse into the directory
-			copy_to_dashboard(src_file, dst_file);
+			transfer_to_dashboard(src_file, dst_file);
 		} else {
 			// open source file
 			in = open(src_file, O_RDONLY);
@@ -287,8 +287,8 @@ int main(int argc, char *argv[])
 			backup(REPORT_DIR, BACKUP_DIR);
 			exit(EXIT_SUCCESS);
 		case 't':
-			printf("file_transfer : Copy to dashboard option selected\n");
-			copy_to_dashboard(REPORT_DIR, DASHBOARD_DIR);
+			printf("file_transfer : Transfer to dashboard option selected\n");
+			transfer_to_dashboard(REPORT_DIR, DASHBOARD_DIR);
 			exit(EXIT_SUCCESS);
 		case 'd':
 			syslog(LOG_INFO, "file_transfer : Daemon option selected"); // make syslog
@@ -302,7 +302,7 @@ int main(int argc, char *argv[])
 	}
 
 	bool doing_backup = false;
-	bool doing_copy = false;
+	bool doing_transfer = false;
 
 	for (;;) { // this is for sitting and waiting when daemon calls it
 		time_t now = time(NULL);
@@ -316,16 +316,16 @@ int main(int argc, char *argv[])
 
 		// TODO: managers must upload to /reports/ by 23:00 if not, log it
 
-		// if it is 01:00, copy to dashboard
-		if (strcmp(current_time, "00:44") == 0) { // TODO: use <library.h> COPY_TIME
-			if (!doing_copy) {
-				doing_copy = true;
-				syslog(LOG_INFO, "DAEMON:file_transfer : initiating automatic copy to dashboard\n");
-				// printf("DAEMON:file_transfer : initiating automatic copy to dashboard\n");
-				copy_to_dashboard(REPORT_DIR, DASHBOARD_DIR);
+		// if it is 01:00, transfer to dashboard
+		if (strcmp(current_time, "00:44") == 0) { // TODO: use <library.h> TRANSFER_TIME
+			if (!doing_transfer) {
+				doing_transfer = true;
+				syslog(LOG_INFO, "DAEMON:file_transfer : initiating automatic transfer to dashboard\n");
+				// printf("DAEMON:file_transfer : initiating automatic transfer to dashboard\n");
+				transfer_to_dashboard(REPORT_DIR, DASHBOARD_DIR);
 			} 
 		} else if (strcmp(current_time, "00:45") == 0) {
-			doing_copy = false;
+			doing_transfer = false;
 		}
 
 		// if it is 03:00, backup
