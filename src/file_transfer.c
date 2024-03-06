@@ -1,3 +1,4 @@
+#include <time.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,8 +13,91 @@
 
 #define MAX_BUF 1024
 
+void lock_directory(char *path);
+void unlock_directory(char *path);
 void copy_to_dashboard(char *src_dir, char *dst_dir);
 void backup(char *src_dir, char *dst_dir);
+
+void lock_directory(char *path) {
+	DIR *dir;
+	struct dirent *entry;
+	struct stat entry_stat;
+	char sub_path[MAX_BUF];
+
+	dir = opendir(path);
+	if (dir == NULL) {
+		perror("opendir");
+		exit(EXIT_FAILURE);
+	}
+
+	while ((entry = readdir(dir)) != NULL) {
+		// skip curr dir and parent dir
+		if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+			continue;
+
+		// construct source path
+		snprintf(sub_path, sizeof(sub_path), "%s/%s", path, entry->d_name);
+
+		// change perms to read-only
+		if (chmod(sub_path, S_IRUSR | S_IRGRP | S_IROTH) == -1) {
+			perror("chmod");
+			exit(EXIT_FAILURE);
+		}
+
+		// check if entry is a directory
+		if (stat(sub_path, &entry_stat) == -1) {
+			perror("stat");
+			exit(EXIT_FAILURE);
+		}
+
+		if (S_ISDIR(entry_stat.st_mode)) {
+			// recurse into the directory
+			lock_directory(sub_path);
+		}
+	}
+}
+
+
+void unlock_directory(char *path) {
+	DIR *dir;
+	struct dirent *entry;
+	struct stat entry_stat;
+	char sub_path[MAX_BUF];
+
+	dir = opendir(path);
+	if (dir == NULL) {
+		perror("opendir");
+		exit(EXIT_FAILURE);
+	}
+
+	while ((entry = readdir(dir)) != NULL) {
+		// skip curr dir and parent dir
+		if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+			continue;
+		}
+
+		// construct source path
+		snprintf(sub_path, sizeof(sub_path), "%s/%s", path, entry->d_name);
+
+		// change perms to read-write
+		if (chmod(sub_path, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IROTH) == -1) {
+			perror("chmod");
+			exit(EXIT_FAILURE);
+		}
+
+		// check if entry is a directory
+		if (stat(sub_path, &entry_stat) == -1) {
+			perror("stat");
+			exit(EXIT_FAILURE);
+		}
+
+		if (S_ISDIR(entry_stat.st_mode)) {
+			// recurse into the directory
+			unlock_directory(sub_path);
+		}
+	}
+}
+
 
 void copy_to_dashboard(char *src_dir, char *dst_dir)
 {
@@ -31,6 +115,9 @@ void copy_to_dashboard(char *src_dir, char *dst_dir)
 		perror("opendir");
 		exit(EXIT_FAILURE);
 	}
+
+	lock_directory(src_dir);
+	lock_directory(dst_dir);
 
 	while ((entry = readdir(dir)) != NULL) {
 		// skip curr dir and parent dir
@@ -51,7 +138,7 @@ void copy_to_dashboard(char *src_dir, char *dst_dir)
 
 		if (S_ISDIR(entry_stat.st_mode)) {
 			// create the directory in dst_dir, if it doesn't exist
-			mkdir(dst_file, 0755);
+			mkdir(dst_file, 0220);
 			// recurse into the directory
 			copy_to_dashboard(src_file, dst_file);
 		} else {
@@ -100,11 +187,12 @@ void copy_to_dashboard(char *src_dir, char *dst_dir)
 	}
 
 	closedir(dir);
+	unlock_directory(src_dir);
+	unlock_directory(dst_dir);
 }
 
 void backup(char *src_dir, char *dst_dir)
 {
-	// TODO: REMEMBER BACKUP MOVES FROM DASHBOARD -> BACKUP
 	DIR *dir;
 	struct dirent *entry;
 	struct stat entry_stat;
@@ -120,6 +208,9 @@ void backup(char *src_dir, char *dst_dir)
 		perror("opendir");
 		exit(EXIT_FAILURE);
 	}
+
+	lock_directory(src_dir);
+	lock_directory(dst_dir);
 
 	while ((entry = readdir(dir)) != NULL) {
 		// printf("file name: %s\n", entry->d_name);
@@ -141,7 +232,8 @@ void backup(char *src_dir, char *dst_dir)
 
 		if (S_ISDIR(entry_stat.st_mode)) {
 			// create dir if doesnt exist
-			mkdir(dst_file, 0755);
+			// perms : owner rwx, group rx, others rx
+			mkdir(dst_file, 0220);
 			// recurse into dir
 			backup(src_file, dst_file);
 		} else {
@@ -154,46 +246,73 @@ void backup(char *src_dir, char *dst_dir)
 	}
 
 	closedir(dir);
+	unlock_directory(src_dir);
+	unlock_directory(dst_dir);
 }
 
 int main(int argc, char *argv[])
 {
-	printf("file_transfer : running as [%d]\n", getpid());
 	int opt;
-	if (argc != 4)
+	if (argc == 2 && strcmp(argv[1], "-d") == 0)
 	{
-		fprintf(stderr, "Usage: %s [-t]/[-b] <src_dir> <dst_dir>\n", argv[0]);
+		syslog(LOG_INFO, "file_transfer : Daemon option selected"); // make syslog
+	}
+	else if (argc != 2)
+	{
+		// -d option doensn't require src_dir and dst_dir
+		fprintf(stderr, "Usage: %s [-t]/[-b]/[-d]\n", argv[0]);
 		exit(EXIT_FAILURE);
 	}
 
-	while ((opt = getopt(argc, argv, "tb")) != -1)
+	printf("file_transfer : running as [%d]\n", getpid());
+
+	while ((opt = getopt(argc, argv, "btd")) != -1)
 	{
 		switch (opt)
 		{
 		case 'b':
 			printf("file_transfer : Backup option selected\n");
-			backup(argv[2], argv[3]);
+			backup(REPORT_DIR, BACKUP_DIR);
 			exit(EXIT_SUCCESS);
 		case 't':
 			printf("file_transfer : Copy to dashboard option selected\n");
-			copy_to_dashboard(argv[2], argv[3]);
+			copy_to_dashboard(REPORT_DIR, DASHBOARD_DIR);
 			exit(EXIT_SUCCESS);
 		case 'd':
 			syslog(LOG_INFO, "file_transfer : Daemon option selected"); // make syslog
 			break;
 		default:
-			fprintf(stderr, "Usage: %s [-t]/[-b] <src_dir> <dst_dir>\n", argv[0]);
+			// -d option doensn't require src_dir and dst_dir
+			// fprintf(stderr, "Usage: %s [-t]/[-b]/([-d]) <src_dir> <dst_dir>\n", argv[0]);
+			fprintf(stderr, "Usage: %s [-t]/[-b]/[-d]\n", argv[0]);
 			exit(EXIT_FAILURE);
 		}
 	}
 
 	for (;;) { // this is for sitting and waiting when daemon calls it
-		// code for checking if time is 1am
-		// call copy_to_dashboard()
-		
-		// code for checking if time is 3am
-		
-		sleep(20);
+		time_t now = time(NULL);
+		struct tm *tm = localtime(&now);
+		char current_time[6];
+
+		strftime(current_time, sizeof(current_time), "%H:%M", tm);
+
+		syslog(LOG_INFO, "DAEMON:file_transfer : idling... %s\n", current_time);
+		printf("DAEMON:file_transfer : idling... %s\n", current_time);
+
+		// TODO: managers must upload to /reports/ by 23:00 if not, log it
+
+		// if it is 01:00, copy to dashboard
+		if (strcmp(current_time, "01:00") == 0) { // TODO: use <library.h> COPY_TIME
+			syslog(LOG_INFO, "DAEMON:file_transfer : initiating automatic copy to dashboard\n");
+			copy_to_dashboard(REPORT_DIR, DASHBOARD_DIR);
+		}
+
+		// if it is 03:00, backup
+		if (strcmp(current_time, "03:00") == 0) {
+			syslog(LOG_INFO, "DAEMON:file_transfer : initiating automatic backup\n");
+			backup(DASHBOARD_DIR, BACKUP_DIR);
+		}
+		sleep(5);
 	}
 
 	return 0;

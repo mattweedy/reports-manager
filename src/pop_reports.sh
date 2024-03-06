@@ -18,3 +18,10 @@ do
     echo "dir: ${dir}"
     rm -rf "${dir}"*
 done
+
+echo "Removing files in ../dashboard/:"
+for dir in ../dashboard/*/
+do
+    echo "dir: ${dir}"
+    rm -rf "${dir}"*
+done

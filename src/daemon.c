@@ -83,14 +83,14 @@ int main()
 	int monitor_pid = fork();
 	if (monitor_pid == 0)
 	{
-		execl("monitor", "%s", REPORT_DIR, NULL); // adjust paths
+		execl("monitor", "monitor", "%s", REPORT_DIR, NULL); // adjust paths
 		exit(EXIT_FAILURE);
 	}
 	// do again for backup
-	int backup_pid = fork();
-	if (backup_pid == 0)
+	int file_transfer_pid = fork();
+	if (file_transfer_pid == 0)
 	{
-		execl("backup", "%s", REPORT_DIR, NULL); // adjust paths
+		execl("file_transfer", "file_transfer", "-d", NULL);
 		exit(EXIT_FAILURE);
 	}
 

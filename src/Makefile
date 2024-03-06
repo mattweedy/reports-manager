@@ -8,6 +8,7 @@ FILE_TRANSFER_PROGRAM = file_transfer
 all: build
 
 build: $(MAIN_PROGRAM) $(MONITOR_PROGRAM) $(FILE_TRANSFER_PROGRAM)
+	@kill $(pgrep $(MAIN_PROGRAM)) 2> /dev/null || true
 	$(CC) -g -c $(GENERAL_LIBRARY).c -o $(GENERAL_LIBRARY).o
 	$(CC) -g -c $(MAIN_PROGRAM).c -o $(MAIN_PROGRAM).o
 	# add new .h file into the following line

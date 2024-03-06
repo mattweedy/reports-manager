@@ -21,7 +21,7 @@
 // 		 can be used to help with this task.
 
 
-
+// TODO: change name to monitor_reports or smth
 
 void monitor_directory(char *path)
 {
