@@ -192,6 +192,7 @@ void transfer_to_dashboard(char *src_dir, char *dst_dir)
 	unlock_directory(dst_dir);
 }
 
+// TODO: FIX PRINTSTAEMENTS
 void backup(char *src_dir, char *dst_dir)
 {
 	DIR *dir;
@@ -211,12 +212,12 @@ void backup(char *src_dir, char *dst_dir)
 	}
 
 	printf("file_transfer : starting backup...\n");
-	printf("file_transfer : locking directories...\n");
+	// printf("file_transfer : locking directories...\n");
 
 	lock_directory(src_dir);
 	lock_directory(dst_dir);
 
-	printf("file_transfer : locked directories...\n");
+	// printf("file_transfer : locked directories...\n");
 
 	while ((entry = readdir(dir)) != NULL) {
 		// printf("file name: %s\n", entry->d_name);
@@ -253,12 +254,12 @@ void backup(char *src_dir, char *dst_dir)
 
 	closedir(dir);
 
-	printf("file_transfer : unlocking directories...\n");
+	// printf("file_transfer : unlocking directories...\n");
 
 	unlock_directory(src_dir);
 	unlock_directory(dst_dir);
 
-	printf("file_transfer : unlocked directories...\n");
+	// printf("file_transfer : unlocked directories...\n");
 	printf("file_transfer : backup complete\n");
 }
 
@@ -284,11 +285,11 @@ int main(int argc, char *argv[])
 		{
 		case 'b':
 			printf("file_transfer : Backup option selected\n");
-			backup(REPORT_DIR, BACKUP_DIR);
+			backup(UPLOAD_DIR, BACKUP_DIR);
 			exit(EXIT_SUCCESS);
 		case 't':
 			printf("file_transfer : Transfer to dashboard option selected\n");
-			transfer_to_dashboard(REPORT_DIR, DASHBOARD_DIR);
+			transfer_to_dashboard(UPLOAD_DIR, REPORTING_DIR);
 			exit(EXIT_SUCCESS);
 		case 'd':
 			syslog(LOG_INFO, "file_transfer : Daemon option selected"); // make syslog
@@ -317,26 +318,26 @@ int main(int argc, char *argv[])
 		// TODO: managers must upload to /reports/ by 23:00 if not, log it
 
 		// if it is 01:00, transfer to dashboard
-		if (strcmp(current_time, "00:44") == 0) { // TODO: use <library.h> TRANSFER_TIME
+		if (strcmp(current_time, "21:10") == 0) { // TODO: use <library.h> TRANSFER_TIME
 			if (!doing_transfer) {
 				doing_transfer = true;
 				syslog(LOG_INFO, "DAEMON:file_transfer : initiating automatic transfer to dashboard\n");
 				// printf("DAEMON:file_transfer : initiating automatic transfer to dashboard\n");
-				transfer_to_dashboard(REPORT_DIR, DASHBOARD_DIR);
+				transfer_to_dashboard(UPLOAD_DIR, REPORTING_DIR);
 			} 
-		} else if (strcmp(current_time, "00:45") == 0) {
+		} else if (strcmp(current_time, "21:11") == 0) {
 			doing_transfer = false;
 		}
 
 		// if it is 03:00, backup
-		if (strcmp(current_time, "00:45") == 0) {
+		if (strcmp(current_time, "21:11") == 0) {
 			if (!doing_backup) {
 				doing_backup = true;
 				syslog(LOG_INFO, "DAEMON:file_transfer : initiating automatic backup\n");
 				// printf("DAEMON:file_transfer : initiating automatic backup\n");
-				backup(DASHBOARD_DIR, BACKUP_DIR);
+				backup(REPORTING_DIR, BACKUP_DIR);
 			}
-		} else if (strcmp(current_time, "00:46") == 0) {
+		} else if (strcmp(current_time, "21:12") == 0) {
 			doing_backup = false;
 		}
 		sleep(5);

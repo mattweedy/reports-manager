@@ -1,9 +1,9 @@
 #!/bin/bash
 
-echo "Creating files in ../reports/:"
-ls ../reports/
+echo "Creating files in ../upload/:"
+ls ../upload/
 
-for dir in ../reports/*/
+for dir in ../upload/*/
 do
     dir=${dir%*/}
     echo "dir: ${dir}"
@@ -19,8 +19,8 @@ do
     rm -rf "${dir}"*
 done
 
-echo "Removing files in ../dashboard/:"
-for dir in ../dashboard/*/
+echo "Removing files in ../reporting/:"
+for dir in ../reporting/*/
 do
     echo "dir: ${dir}"
     rm -rf "${dir}"*
