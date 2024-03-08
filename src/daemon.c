@@ -73,10 +73,20 @@ static void become_daemon(void)
 	}
 
 	// Step 5: Change working directory
-	chdir("/");
+	// chdir("/");
+	if (chdir("/") < 0)
+	{
+		syslog(LOG_ERR, "reports_manager : failed to change working directory to /");
+		exit(EXIT_FAILURE);
+	}
 
 	// Step 6: Set new file permissions
-	umask(0);
+	// umask(0);
+	mode_t old_mask = umask(0);
+	if (old_mask != 022)
+	{
+		syslog(LOG_WARNING, "reports_manager : unexpected umask: %03o", old_mask);
+	}
 
 	// Step 7: Close all open file descriptors
 	for (long fd = sysconf(_SC_OPEN_MAX); fd >= 0; fd--)
@@ -108,6 +118,8 @@ void clean_exit(int sigid) {
 	exit(EXIT_SUCCESS);
 
 }
+
+
 int main(void)
 {
 	printf("reports_manager : running as [%d]\n", getpid());
@@ -121,7 +133,7 @@ int main(void)
 	monitor_pid = fork();
 	if (monitor_pid == 0)
 	{
-		execl("monitor", "monitor", "%s", UPLOAD_DIR, NULL); // adjust paths
+		execl("monitor", "monitor", "%s", UPLOAD_DIR, NULL);
 		exit(EXIT_FAILURE);
 	}
 	// do again for backup
@@ -129,19 +141,17 @@ int main(void)
 	if (file_transfer_pid == 0)
 	{
 		execl("file_transfer", "file_transfer", "-d", NULL);
-		printf("reports_manager : file_transfer daemon failed to start\n");
 		exit(EXIT_FAILURE);
 	}
 
-	// Main loop: log every 20 seconds
+	// main loop: log every 20 seconds
 	while (1)
 	{
-		syslog(LOG_NOTICE, "reports_manager started");
+		syslog(LOG_NOTICE, "reports_manager running - PID [%d]", getpid());
 		sleep(20);
-		// break; - will cause pain
 	}
 
-	// Log termination and close log file
+	// log termination and close log file
 	syslog(LOG_NOTICE, "reports_manager terminated");
 	closelog();
 
