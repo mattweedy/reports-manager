@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "*.pro": "prolog",
-        "unistd.h": "c"
+        "unistd.h": "c",
+        "stdio.h": "c"
     }
 }

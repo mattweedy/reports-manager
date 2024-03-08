@@ -12,8 +12,23 @@
 
 #include "library.h"
 
+// TODO: Singleton processes
+// 		- Daemon setup using an init script
+// 		  implementing the singleton pattern
+// 		  and using header files to store
+// 		  configurable variables. The init
+// 		  script can be used to start/stop the
+// 		  daemon.
+
+
+static void become_daemon(void);
+void clean_exit(int sigid);
+
+pid_t monitor_pid = -1;
+pid_t file_transfer_pid = -1;
+
 // Function to transform main process into a daemon
-static void become_daemon()
+static void become_daemon(void)
 {
 	pid_t child_pid;
 
@@ -64,46 +79,70 @@ static void become_daemon()
 	umask(0);
 
 	// Step 7: Close all open file descriptors
-	for (int fd = sysconf(_SC_OPEN_MAX); fd >= 0; fd--)
+	for (long fd = sysconf(_SC_OPEN_MAX); fd >= 0; fd--)
 	{
-		close(fd);
+		close((int)fd);
 	}
 
 	// Open log file
-	openlog("mydaemon", LOG_PID, LOG_DAEMON);
+	openlog("reports_manager", LOG_PID, LOG_DAEMON);
 }
 
 
-int main()
+
+void clean_exit(int sigid) {
+	if (sigid == SIGTERM || sigid == SIGINT) {
+		syslog(LOG_NOTICE, "reports_manager terminated");
+	}
+	else {
+		syslog(LOG_NOTICE, "Unidentified signal (%d) received", sigid);
+
+	}
+	if (monitor_pid != -1) {
+		kill(monitor_pid, SIGTERM);
+	}
+	if (file_transfer_pid != -1) {
+		kill(file_transfer_pid, SIGTERM);
+	}
+	closelog();
+	exit(EXIT_SUCCESS);
+
+}
+int main(void)
 {
-	printf("daemon : running as [%d]\n", getpid());
-	// Transform into a daemon process
+	printf("reports_manager : running as [%d]\n", getpid());
+	// transform into a daemon process
 	become_daemon();
+
+	signal(SIGINT, clean_exit);
+	signal(SIGTERM, clean_exit);
+
 	// here code
-	int monitor_pid = fork();
+	monitor_pid = fork();
 	if (monitor_pid == 0)
 	{
-		execl("monitor", "monitor", "%s", REPORT_DIR, NULL); // adjust paths
+		execl("monitor", "monitor", "%s", UPLOAD_DIR, NULL); // adjust paths
 		exit(EXIT_FAILURE);
 	}
 	// do again for backup
-	int file_transfer_pid = fork();
+	file_transfer_pid = fork();
 	if (file_transfer_pid == 0)
 	{
 		execl("file_transfer", "file_transfer", "-d", NULL);
+		printf("reports_manager : file_transfer daemon failed to start\n");
 		exit(EXIT_FAILURE);
 	}
 
 	// Main loop: log every 20 seconds
 	while (1)
 	{
-		syslog(LOG_NOTICE, "mydaemon started");
+		syslog(LOG_NOTICE, "reports_manager started");
 		sleep(20);
 		// break; - will cause pain
 	}
 
 	// Log termination and close log file
-	syslog(LOG_NOTICE, "mydaemon terminated");
+	syslog(LOG_NOTICE, "reports_manager terminated");
 	closelog();
 
 	return EXIT_SUCCESS;

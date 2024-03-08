@@ -29,6 +29,32 @@
             "MIMode": "gdb",
             "miDebuggerPath": "/usr/bin/gdb",
             "externalConsole": false
+        },
+        {
+            "name": "C Compile Launch & Debug Monitor",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/monitor",
+            "args": [],
+            "stopAtEntry": false,
+            // "environment": [{ "name": "config", "value": "Debug" }],
+            "cwd": "${workspaceFolder}",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "daemon build file",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "externalConsole": false
         }
     ]
 }

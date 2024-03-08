@@ -14,12 +14,16 @@
 
 #define MAX_BUF 1024
 
-void lock_directory(char *path);
-void unlock_directory(char *path);
-void transfer_to_dashboard(char *src_dir, char *dst_dir);
-void backup(char *src_dir, char *dst_dir);
+void lock_directory(const char *path);
+void unlock_directory(const char *path);
+void call_backup(const char *src_dir, const char *dst_dir);
+void backup(const char *src_dir, const char *dst_dir);
+void transfer_to_dashboard(const char *src_dir, const char *dst_dir);
 
-void lock_directory(char *path) {
+// TODO: implement check_time so can use TRANSFER_TIME/BACKUP_TIME and check for minute passed
+
+
+void lock_directory(const char *path) {
 	DIR *dir;
 	struct dirent *entry;
 	struct stat entry_stat;
@@ -59,7 +63,7 @@ void lock_directory(char *path) {
 }
 
 
-void unlock_directory(char *path) {
+void unlock_directory(const char *path) {
 	DIR *dir;
 	struct dirent *entry;
 	struct stat entry_stat;
@@ -100,7 +104,15 @@ void unlock_directory(char *path) {
 }
 
 
-void transfer_to_dashboard(char *src_dir, char *dst_dir)
+void call_backup(const char *src_dir, const char *dst_dir){
+	printf("file_transfer : starting backup...\n");
+	backup(src_dir, dst_dir);
+	printf("file_transfer : backup complete\n");
+
+}
+
+
+void backup(const char *src_dir, const char *dst_dir) // copies files from reporting -> backup
 {
 	DIR *dir;
 	struct dirent *entry;
@@ -141,7 +153,7 @@ void transfer_to_dashboard(char *src_dir, char *dst_dir)
 			// create the directory in dst_dir, if it doesn't exist
 			mkdir(dst_file, 0220);
 			// recurse into the directory
-			transfer_to_dashboard(src_file, dst_file);
+			backup(src_file, dst_file);
 		} else {
 			// open source file
 			in = open(src_file, O_RDONLY);
@@ -157,10 +169,10 @@ void transfer_to_dashboard(char *src_dir, char *dst_dir)
 				close(in);
 				exit(EXIT_FAILURE);
 			}
-
+		
 			// copy file
 			while ((len = read(in, buffer, sizeof(buffer))) > 0) {
-				if (write(out, buffer, len) != len) {
+				if (write(out, buffer, (size_t)len) != len) {
 					perror("write");
 					close(in);
 					close(out);
@@ -192,17 +204,18 @@ void transfer_to_dashboard(char *src_dir, char *dst_dir)
 	unlock_directory(dst_dir);
 }
 
+
+
+
+
 // TODO: FIX PRINTSTAEMENTS
-void backup(char *src_dir, char *dst_dir)
+void transfer_to_dashboard(const char *src_dir, const char *dst_dir) // removes files from upload sends -> reporting (dashboard)
 {
 	DIR *dir;
 	struct dirent *entry;
 	struct stat entry_stat;
 	char src_file[MAX_BUF];
 	char dst_file[MAX_BUF];
-	char buffer[MAX_BUF];
-	int in, out;
-	ssize_t len;
 
 	dir = opendir(src_dir);
 	if (dir == NULL)
@@ -211,13 +224,8 @@ void backup(char *src_dir, char *dst_dir)
 		exit(EXIT_FAILURE);
 	}
 
-	printf("file_transfer : starting backup...\n");
-	// printf("file_transfer : locking directories...\n");
-
 	lock_directory(src_dir);
 	lock_directory(dst_dir);
-
-	// printf("file_transfer : locked directories...\n");
 
 	while ((entry = readdir(dir)) != NULL) {
 		// printf("file name: %s\n", entry->d_name);
@@ -242,7 +250,7 @@ void backup(char *src_dir, char *dst_dir)
 			// perms : owner rwx, group rx, others rx
 			mkdir(dst_file, 0220);
 			// recurse into dir
-			backup(src_file, dst_file);
+			transfer_to_dashboard(src_file, dst_file);
 		} else {
 			// move file
 			if (rename(src_file, dst_file) == -1) {
@@ -254,17 +262,13 @@ void backup(char *src_dir, char *dst_dir)
 
 	closedir(dir);
 
-	// printf("file_transfer : unlocking directories...\n");
-
 	unlock_directory(src_dir);
 	unlock_directory(dst_dir);
-
-	// printf("file_transfer : unlocked directories...\n");
-	printf("file_transfer : backup complete\n");
 }
 
 int main(int argc, char *argv[])
 {
+	openlog("file_transfer", LOG_PID | LOG_CONS, LOG_DAEMON);
 	int opt;
 	if (argc == 2 && strcmp(argv[1], "-d") == 0)
 	{
@@ -285,7 +289,7 @@ int main(int argc, char *argv[])
 		{
 		case 'b':
 			printf("file_transfer : Backup option selected\n");
-			backup(UPLOAD_DIR, BACKUP_DIR);
+			call_backup(REPORTING_DIR, BACKUP_DIR);
 			exit(EXIT_SUCCESS);
 		case 't':
 			printf("file_transfer : Transfer to dashboard option selected\n");
@@ -318,26 +322,24 @@ int main(int argc, char *argv[])
 		// TODO: managers must upload to /reports/ by 23:00 if not, log it
 
 		// if it is 01:00, transfer to dashboard
-		if (strcmp(current_time, "21:10") == 0) { // TODO: use <library.h> TRANSFER_TIME
+		if (strcmp(current_time, TRANSFER_TIME) == 0) { // TODO: use <library.h> TRANSFER_TIME
 			if (!doing_transfer) {
 				doing_transfer = true;
 				syslog(LOG_INFO, "DAEMON:file_transfer : initiating automatic transfer to dashboard\n");
-				// printf("DAEMON:file_transfer : initiating automatic transfer to dashboard\n");
 				transfer_to_dashboard(UPLOAD_DIR, REPORTING_DIR);
 			} 
-		} else if (strcmp(current_time, "21:11") == 0) {
+		} else if (strcmp(current_time, "14:51") == 0) {
 			doing_transfer = false;
 		}
-
+		
 		// if it is 03:00, backup
-		if (strcmp(current_time, "21:11") == 0) {
+		if (strcmp(current_time, BACKUP_TIME) == 0) {
 			if (!doing_backup) {
 				doing_backup = true;
 				syslog(LOG_INFO, "DAEMON:file_transfer : initiating automatic backup\n");
-				// printf("DAEMON:file_transfer : initiating automatic backup\n");
-				backup(REPORTING_DIR, BACKUP_DIR);
+				call_backup(REPORTING_DIR, BACKUP_DIR);
 			}
-		} else if (strcmp(current_time, "21:12") == 0) {
+		} else if (strcmp(current_time, "14:52") == 0) {
 			doing_backup = false;
 		}
 		sleep(5);
