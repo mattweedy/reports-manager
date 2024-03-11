@@ -1,4 +1,4 @@
-# My Manufacturing App
+# Reports Management System
 
 This application is designed to manage the operations of a manufacturing company. It includes a daemon that continually manages the operations, logging of new or modified xml reports, backing up of the dashboard directory content, moving of uploaded reports to the reporting directory, and inter-process communication (IPC).
 
