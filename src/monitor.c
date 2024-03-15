@@ -87,7 +87,6 @@ void monitor_directory(const char *path)
 	signal(SIGTERM, clean_exit);
 
 	ssize_t buffer_read_length = 0;
-	long unsigned int i = 0;
 	int fd;
 	int wd;
 

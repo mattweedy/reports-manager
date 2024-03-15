@@ -379,8 +379,6 @@ void transfer_to_dashboard(const char *src_dir, const char *dst_dir)
 int main(int argc, char *argv[])
 {
 	// variables
-	bool doing_backup = false;
-	bool doing_transfer = false;
 	int opt;
 
 	openlog("file_transfer", LOG_PID | LOG_CONS, LOG_DAEMON);
