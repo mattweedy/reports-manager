@@ -140,7 +140,6 @@ void monitor_directory(const char *path)
 				&& event_length_uint32_t >= inotify_event_size_uint32_t
 				&& event_length_long <= buffer_read_length)
 		{
-			syslog(LOG_DEBUG, "monitor : event detected\n");
 			if (event->len > 0)
 			{
 				syslog(LOG_DEBUG, "monitor : event detected on %s\n", event->name);
