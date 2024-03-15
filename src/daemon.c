@@ -1,4 +1,5 @@
 #include <time.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -7,6 +8,7 @@
 #include <dirent.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/file.h>
 #include <sys/types.h>
 #include <sys/inotify.h>
 
@@ -57,6 +59,7 @@ static void become_daemon(void)
 	signal(SIGCHLD, SIG_IGN);
 	signal(SIGHUP, SIG_IGN);
 
+
 	// Step 4: Second fork to detach completely
 	child_pid = fork();
 
@@ -72,26 +75,39 @@ static void become_daemon(void)
 		exit(EXIT_SUCCESS);
 	}
 
-	// Step 5: Change working directory
+
+	// Step 6: Change working directory
 	// chdir("/");
-	if (chdir("/") < 0)
+	if (chdir("/mnt/d/Matthew/OneDrive - Technological University Dublin/Documents/year 4 sem 2/sys_soft/assignment/src") < 0)
 	{
 		syslog(LOG_ERR, "reports_manager : failed to change working directory to /");
 		exit(EXIT_FAILURE);
 	}
 
-	// Step 6: Set new file permissions
-	// umask(0);
+	// Step 7: Set new file permissions
 	mode_t old_mask = umask(0);
 	if (old_mask != 022)
 	{
 		syslog(LOG_WARNING, "reports_manager : unexpected umask: %03o", old_mask);
 	}
 
-	// Step 7: Close all open file descriptors
+	// Step 8: Close all open file descriptors
 	for (long fd = sysconf(_SC_OPEN_MAX); fd >= 0; fd--)
 	{
 		close((int)fd);
+	}
+
+	// step 5: singleton pattern implementation
+	int pid_file = open("/tmp/daemon.pid", O_CREAT | O_RDWR, 0666);
+	int rc = flock(pid_file, LOCK_EX | LOCK_NB);
+	syslog(LOG_NOTICE, "reports_manager : flock returned %d", rc);
+	if (rc)
+	{
+		if (EWOULDBLOCK == errno)
+		{
+			syslog(LOG_ERR, "reports_manager : another instance is already running");
+			exit(EXIT_FAILURE);
+		}
 	}
 
 	// Open log file
@@ -122,25 +138,39 @@ void clean_exit(int sigid) {
 
 int main(void)
 {
-	printf("reports_manager : running as [%d]\n", getpid());
+	// char temp[1024];
+	// char monitor_path[1024];
+	// if (getcwd(temp, sizeof(temp)) != NULL) {
+	// 	snprintf(monitor_path, sizeof(monitor_path), "%s/%s", temp, "monitor");
+	// }
+	// char file_transfer_path[1024];
+	// if (getcwd(temp, sizeof(temp)) != NULL) {
+	// 	snprintf(file_transfer_path, sizeof(file_transfer_path), "%s/%s", temp, "file_transfer");
+	// }
+
 	// transform into a daemon process
 	become_daemon();
 
 	signal(SIGINT, clean_exit);
 	signal(SIGTERM, clean_exit);
 
-	// here code
+	// fork monitor and file_transfer
+	syslog(LOG_NOTICE, "reports_manager : starting monitor");
 	monitor_pid = fork();
 	if (monitor_pid == 0)
 	{
-		execl("monitor", "monitor", "%s", UPLOAD_DIR, NULL);
+		execl("monitor", "monitor", UPLOAD_DIR, NULL);
+		syslog(LOG_ERR, "reports_manager : failed to start monitor : %s", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
+
 	// do again for backup
+	syslog(LOG_NOTICE, "reports_manager : starting file_transfer");
 	file_transfer_pid = fork();
 	if (file_transfer_pid == 0)
 	{
 		execl("file_transfer", "file_transfer", "-d", NULL);
+		syslog(LOG_ERR, "reports_manager : failed to start file_transfer : %s", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 

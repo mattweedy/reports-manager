@@ -1,27 +1,21 @@
 #include <time.h>
+#include <errno.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
-
 #include <signal.h>
-
 #include <string.h>
 #include <syslog.h>
-#include <errno.h>
-
 #include <sys/inotify.h>
-
 #include "library.h"
 
 #define EVENT_SIZE (sizeof(struct inotify_event))
-#define BUF_LEN (1024 * (EVENT_SIZE + 16))
 #define TIMESTAMP_SIZE 20
 #define FILE_PATH_SIZE 256
+#define INOTIFY_BUFFER_SIZE 8192
+
 
 FILE *logfile;
-
-// TODO: If a file wasn’t uploaded this should be logged in the system. (A naming convention
-// 		 can be used to help with this task.
 
 void current_timestamp(char *timestamp);
 void monitor_directory(const char *path);
@@ -35,6 +29,7 @@ void current_timestamp(char *timestamp)
 	struct tm tm = *localtime(&t);
 	sprintf(timestamp, "[%d-%02d-%02d %02d:%02d:%02d]", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 }
+
 
 const char *get_message_name(struct inotify_event *event)
 {
@@ -85,20 +80,23 @@ void clean_exit(int sig)
 void monitor_directory(const char *path)
 {
 	printf("monitor : running as [%d]\n", getpid());
+	syslog(LOG_INFO, "monitor_directory() : running as [%d] monitoring %s", getpid(), path);
 	signal(SIGINT, clean_exit);
 	signal(SIGTERM, clean_exit);
 
-	ssize_t length = 0;
+	ssize_t buffer_read_length = 0;
 	long unsigned int i = 0;
 	int fd;
 	int wd;
-	char buffer[BUF_LEN];
+
+	char buffer[INOTIFY_BUFFER_SIZE];
 
 	fd = inotify_init();
 
 	if (fd < 0)
 	{
 		perror("inotify_init");
+		syslog(LOG_ERR, "monitor : inotify_init failed: %s", strerror(errno));
 		return;
 	}
 
@@ -108,25 +106,32 @@ void monitor_directory(const char *path)
 	{
 
 		perror("inotify_add_watch");
+		syslog(LOG_ERR, "monitor : inotify_add_watch failed: %s", strerror(errno));
 		close(fd);
 		return;
 	}
 
 	while (1)
 	{
-		i = 0;
-		length = read(fd, buffer, BUF_LEN);
-		if (length < 0)
+		
+		buffer_read_length = read(fd, buffer, INOTIFY_BUFFER_SIZE);
+		if (buffer_read_length < 0)
 		{
 			perror("read");
+			syslog(LOG_ERR, "monitor : read failed: %s", strerror(errno));
 			break;
 		}
+		struct inotify_event *event;
+		event = (struct inotify_event *)&buffer;
 
-		while ((ssize_t)i < length)
+		// while len >= the size of inotfiy event and size of inotify struct and length is less than the buffer size remaining
+		// TODO: divide into variables and make multi line
+		while (buffer_read_length >= (long)(sizeof(struct inotify_event)) && (uint32_t)event->len >= (uint32_t)(sizeof(struct inotify_event)) &&  (long)event->len <= buffer_read_length)
 		{
-			struct inotify_event *event = (struct inotify_event *)&buffer[i];
+			syslog(LOG_DEBUG, "monitor : event detected\n");
 			if (event->len > 0)
 			{
+				syslog(LOG_DEBUG, "monitor : event detected on %s\n", event->name);
 				char timestamp[TIMESTAMP_SIZE]; // Create a buffer to store the timestamp
 				current_timestamp(timestamp);	// Get the current timestamp
 
@@ -134,20 +139,8 @@ void monitor_directory(const char *path)
 
 				fflush(logfile);
 			}
-			i += EVENT_SIZE + event->len;
-		}
-
-		// Check if the expected file exists in the upload directory at 11:30pm
-		time_t t = time(NULL);
-		struct tm tm = *localtime(&t);
-		if (tm.tm_hour == 23 && tm.tm_min == 30)
-		{
-			char expected_file_path[FILE_PATH_SIZE];
-			sprintf(expected_file_path, "%s/%s", path, "");
-			if (access(expected_file_path, F_OK) == -1)
-			{
-				fprintf(logfile, "The expected file was not uploaded by 11:30pm.\n");
-			}
+			// new event 
+			event = (buffer_read_length -= event->len, (struct inotify_event*)(((char*)event) +  event->len));
 		}
 	}
 

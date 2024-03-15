@@ -2,6 +2,9 @@
     "files.associations": {
         "*.pro": "prolog",
         "unistd.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "syslog.h": "c",
+        "stdlib.h": "c",
+        "signal.h": "c"
     }
 }

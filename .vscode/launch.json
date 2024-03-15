@@ -38,7 +38,33 @@
             "args": [],
             "stopAtEntry": false,
             // "environment": [{ "name": "config", "value": "Debug" }],
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/src",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "daemon build file",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "externalConsole": false
+        },
+        {
+            "name": "C Compile Launch & Debug File_Transfer",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/file_transfer",
+            "args": ["-d"],
+            "stopAtEntry": false,
+            // "environment": [{ "name": "config", "value": "Debug" }],
+            "cwd": "${workspaceFolder}/src",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",
