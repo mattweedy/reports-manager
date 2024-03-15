@@ -11,21 +11,13 @@
 #include <sys/file.h>
 #include <sys/types.h>
 #include <sys/inotify.h>
-
 #include "library.h"
 
-// TODO: Singleton processes
-// 		- Daemon setup using an init script
-// 		  implementing the singleton pattern
-// 		  and using header files to store
-// 		  configurable variables. The init
-// 		  script can be used to start/stop the
-// 		  daemon.
-
-
+// function signatures
 static void become_daemon(void);
 void clean_exit(int sigid);
 
+// variables
 pid_t monitor_pid = -1;
 pid_t file_transfer_pid = -1;
 
@@ -59,7 +51,6 @@ static void become_daemon(void)
 	signal(SIGCHLD, SIG_IGN);
 	signal(SIGHUP, SIG_IGN);
 
-
 	// Step 4: Second fork to detach completely
 	child_pid = fork();
 
@@ -75,8 +66,7 @@ static void become_daemon(void)
 		exit(EXIT_SUCCESS);
 	}
 
-
-	// Step 6: Change working directory
+	// Step 5: Change working directory
 	// chdir("/");
 	if (chdir("/mnt/d/Matthew/OneDrive - Technological University Dublin/Documents/year 4 sem 2/sys_soft/assignment/src") < 0)
 	{
@@ -84,20 +74,20 @@ static void become_daemon(void)
 		exit(EXIT_FAILURE);
 	}
 
-	// Step 7: Set new file permissions
+	// Step 6: Set new file permissions
 	mode_t old_mask = umask(0);
 	if (old_mask != 022)
 	{
 		syslog(LOG_WARNING, "reports_manager : unexpected umask: %03o", old_mask);
 	}
 
-	// Step 8: Close all open file descriptors
+	// Step 7: Close all open file descriptors
 	for (long fd = sysconf(_SC_OPEN_MAX); fd >= 0; fd--)
 	{
 		close((int)fd);
 	}
 
-	// step 5: singleton pattern implementation
+	// step 8: singleton pattern implementation
 	int pid_file = open("/tmp/daemon.pid", O_CREAT | O_RDWR, 0666);
 	int rc = flock(pid_file, LOCK_EX | LOCK_NB);
 	syslog(LOG_NOTICE, "reports_manager : flock returned %d", rc);
@@ -110,65 +100,60 @@ static void become_daemon(void)
 		}
 	}
 
-	// Open log file
+	// open log file
 	openlog("reports_manager", LOG_PID, LOG_DAEMON);
 }
 
-
-
-void clean_exit(int sigid) {
-	if (sigid == SIGTERM || sigid == SIGINT) {
+// function to handle termination signals
+void clean_exit(int sigid)
+{
+	if (sigid == SIGTERM || sigid == SIGINT)
+	{
 		syslog(LOG_NOTICE, "reports_manager terminated");
 	}
-	else {
+	else
+	{
 		syslog(LOG_NOTICE, "Unidentified signal (%d) received", sigid);
-
 	}
-	if (monitor_pid != -1) {
+	if (monitor_pid != -1)
+	{
 		kill(monitor_pid, SIGTERM);
 	}
-	if (file_transfer_pid != -1) {
+	if (file_transfer_pid != -1)
+	{
 		kill(file_transfer_pid, SIGTERM);
 	}
 	closelog();
 	exit(EXIT_SUCCESS);
-
 }
 
-
+// main function
 int main(void)
 {
-	// char temp[1024];
-	// char monitor_path[1024];
-	// if (getcwd(temp, sizeof(temp)) != NULL) {
-	// 	snprintf(monitor_path, sizeof(monitor_path), "%s/%s", temp, "monitor");
-	// }
-	// char file_transfer_path[1024];
-	// if (getcwd(temp, sizeof(temp)) != NULL) {
-	// 	snprintf(file_transfer_path, sizeof(file_transfer_path), "%s/%s", temp, "file_transfer");
-	// }
-
 	// transform into a daemon process
 	become_daemon();
 
+	// register signal handlers
 	signal(SIGINT, clean_exit);
 	signal(SIGTERM, clean_exit);
 
-	// fork monitor and file_transfer
+	// fork monitor
 	syslog(LOG_NOTICE, "reports_manager : starting monitor");
 	monitor_pid = fork();
 	if (monitor_pid == 0)
 	{
+		// if child process, start monitor
 		execl("monitor", "monitor", UPLOAD_DIR, NULL);
 		syslog(LOG_ERR, "reports_manager : failed to start monitor : %s", strerror(errno));
 		exit(EXIT_FAILURE);
 	}
 
-	// do again for backup
+	// fork file_transfer
 	syslog(LOG_NOTICE, "reports_manager : starting file_transfer");
 	file_transfer_pid = fork();
 	if (file_transfer_pid == 0)
 	{
+		// if child process, start file_transfer
 		execl("file_transfer", "file_transfer", "-d", NULL);
 		syslog(LOG_ERR, "reports_manager : failed to start file_transfer : %s", strerror(errno));
 		exit(EXIT_FAILURE);

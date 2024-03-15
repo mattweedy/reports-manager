@@ -1,0 +1,15 @@
+# Compiled Files
+*.o
+a.out
+*.bin
+
+# IDE/Editor Files
+.vscode/
+*.code-workspace
+
+# Operating System Files
+.DS_Store
+*~
+
+# Secret Files
+.env
