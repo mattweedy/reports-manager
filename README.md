@@ -24,7 +24,7 @@ You will need a Linux environment with GCC compiler installed.
 3. The daemon will automatically move the uploaded reports to the reporting directory at 1am.
 4. The dashboard directory content is backed up every night.
 5. Details of new or modified xml reports are logged and can be viewed in the `/var/log/reports_manager/` directory in `/var/log/reports_manager/monitor-logs.txt`.
-6. Any reports not uploaded by 11:30p will be logged in the same directory.
+6. Any reports not uploaded by 11:30pm will be logged in the same directory.
 
 ## Built With
 
